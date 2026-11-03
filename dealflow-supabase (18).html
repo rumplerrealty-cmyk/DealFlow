@@ -1,0 +1,2154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DealFlow (Supabase)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <script>
+    // Fallback to unpkg if jsdelivr is slow/blocked
+    setTimeout(function() {
+      if (typeof window.supabase === 'undefined') {
+        const s = document.createElement('script');
+        s.src = 'https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
+        s.onload = function() { location.reload(); };
+        document.head.appendChild(s);
+      }
+    }, 4000);
+  </script>
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --sidebar: #ffffff;
+      --sidebar-hover: #f1f5f9;
+      --primary: #3b82f6;
+      --primary-dark: #2563eb;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --card: #ffffff;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --radius: 12px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* CONFIG / LOGIN */
+    #config-screen, #login-screen {
+      min-height: 100vh;
+      display: flex; /* visible by default so page is never blank */
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      padding: 20px;
+    }
+    .login-card, .config-card {
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+    }
+    .config-card { max-width: 520px; }
+    .login-card h1, .config-card h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--sidebar);
+    }
+    .login-card p, .config-card p {
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 15px;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-secondary { background: white; color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: #f8fafc; }
+    .btn-danger { background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; }
+    .btn-danger:hover { background: #fee2e2; }
+    .btn-sm { padding: 6px 12px; font-size: 13px; }
+    .btn-block { width: 100%; }
+    .login-error {
+      background: #fef2f2;
+      color: var(--danger);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .login-footer {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .login-footer a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .sync-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      background: #ecfdf5;
+      color: #047857;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+    .sync-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    /* APP LAYOUT */
+    #app { display: none; min-height: 100vh; }
+    .layout { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: 240px;
+      background: var(--sidebar);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 50;
+    }
+    .sidebar-brand {
+      padding: 18px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sidebar-brand img {
+      height: 48px;
+      width: auto;
+    }
+    .sidebar-brand span:first-child {
+      width: 28px;
+      height: 28px;
+      background: var(--primary);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .sidebar-nav { flex: 1; padding: 8px 12px; }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 14px;
+      border-radius: 8px;
+      color: #334155;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-bottom: 2px;
+      text-decoration: none;
+      position: relative;
+    }
+    .nav-item:hover { background: var(--sidebar-hover); color: #0f172a; }
+    .nav-item.active { background: #eff6ff; color: var(--primary); }
+    .nav-item .badge {
+      position: absolute;
+      right: 12px;
+      background: var(--danger);
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 10px;
+      min-width: 20px;
+      text-align: center;
+    }
+    .sidebar-footer {
+      padding: 16px 20px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.5;
+    }
+    .main {
+      flex: 1;
+      margin-left: 240px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .topbar {
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .topbar h1 { font-size: 20px; font-weight: 600; }
+    .topbar-actions { display: flex; align-items: center; gap: 12px; }
+    .search-box {
+      display: flex;
+      align-items: center;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      width: 240px;
+    }
+    .search-box input {
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 14px;
+      width: 100%;
+      font-family: inherit;
+    }
+    .user-menu {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .user-avatar {
+      width: 34px;
+      height: 34px;
+      background: var(--primary);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .content { padding: 24px 28px; flex: 1; }
+
+    /* STATS */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+    .stat-card .label {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    .stat-card .value {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .stat-card .sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* CARDS */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-header h2 { font-size: 15px; font-weight: 600; }
+    .card-body { padding: 0; }
+
+    /* TASKS */
+    .task-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+    .task-item:last-child { border-bottom: none; }
+    .task-item:hover { background: #f8fafc; }
+    .task-item input[type="checkbox"] {
+      margin-top: 3px;
+      width: 16px;
+      height: 16px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+    .task-content { flex: 1; min-width: 0; }
+    .task-title {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+    .task-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .task-date {
+      background: #fef3c7;
+      color: #b45309;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .task-actions {
+      display: flex;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .task-item:hover .task-actions { opacity: 1; }
+    .icon-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .icon-btn:hover { background: #f1f5f9; color: var(--text); }
+
+    /* TABLE */
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      text-align: left;
+      padding: 12px 16px;
+      font-weight: 600;
+      color: var(--text-muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      border-bottom: 1px solid var(--border);
+      background: #f8fafc;
+    }
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .status-offer-sent { background: #dbeafe; color: #1d4ed8; }
+    .status-accepted { background: #d1fae5; color: #047857; }
+    .status-offer-draft { background: #f1f5f9; color: #475569; }
+    .status-closed { background: #e0e7ff; color: #4338ca; }
+    .status-under-contract { background: #fef3c7; color: #b45309; }
+    .status-attorney-review { background: #fce7f3; color: #9d174d; }
+
+    .empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .data-section {
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .data-section h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-right: auto;
+    }
+    .page { display: none; }
+    .page.active { display: block; }
+    .list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .list-header h2 { font-size: 18px; font-weight: 600; }
+
+    /* MODAL */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,23,42,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 560px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-header h3 { font-size: 18px; font-weight: 600; }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: var(--text-muted);
+      line-height: 1;
+      padding: 4px;
+    }
+    .modal-body { padding: 24px; }
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    /* FILES */
+    .files-section {
+      margin-top: 20px;
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+    }
+    .files-section h4 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .file-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #f8fafc;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .file-item .file-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .file-item .file-size {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--primary);
+      background: #eff6ff;
+      color: var(--primary);
+    }
+    .upload-zone input { display: none; }
+
+    /* LOADING */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(255,255,255,0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      font-size: 15px;
+      color: var(--text-muted);
+      flex-direction: column;
+      gap: 12px;
+    }
+    .loading-overlay.show { display: flex; }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #e2e8f0;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-banner {
+      background: #fef2f2;
+      color: #b91c1c;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      display: none;
+    }
+
+    @media (max-width: 1100px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) {
+      .sidebar { width: 70px; }
+      .sidebar-brand span + span,
+      .nav-item span:not(.badge),
+      .sidebar-footer { display: none; }
+      .sidebar-brand { justify-content: center; padding: 18px 0; }
+      .nav-item { justify-content: center; padding: 14px; }
+      .main { margin-left: 70px; }
+      .stats { grid-template-columns: 1fr 1fr; }
+      .topbar { padding: 12px 16px; }
+      .content { padding: 16px; }
+      .search-box { display: none; }
+      .form-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <!-- CONFIG SCREEN -->
+  <div id="config-screen">
+    <div class="config-card">
+      <h1>Connect Supabase</h1>
+      <p>Paste your Supabase project URL and anon key. This is a one-time setup.</p>
+      <div class="form-group">
+        <label>Project URL</label>
+        <input type="text" id="sb-url" placeholder="https://xxxxxxxx.supabase.co" />
+      </div>
+      <div class="form-group">
+        <label>Anon / Public Key</label>
+        <input type="text" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+        <div class="hint">Find these in Supabase → Project Settings → API</div>
+      </div>
+      <div id="lib-status" style="font-size:13px;margin:10px 0;color:#64748b;">Checking Supabase library…</div>
+      <button type="button" class="btn btn-primary btn-block" onclick="saveSupabaseConfig()">Connect & Continue</button>
+      <div class="login-footer" style="margin-top:16px">
+        <a onclick="showSetupHelp()">Need help setting up the database?</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIN SCREEN -->
+  <div id="login-screen" style="display:none">
+    <div class="login-card">
+      <h1>DealFlow</h1>
+      <p style="margin-bottom:8px">Moshe Rumpler Professional Real Estate</p>
+      <p>Enter the shared team password to continue<br>
+        <span class="sync-badge"><span class="sync-dot"></span> Supabase live sync</span>
+      </p>
+      <div class="login-error" id="login-error">Incorrect team password</div>
+      <form id="login-form">
+        <div class="form-group">
+          <label>Team Password</label>
+          <input type="password" id="login-pass" placeholder="Enter team password" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Enter DealFlow</button>
+      </form>
+      <div class="login-footer">
+        Default password: <strong>dealflow2026</strong><br>
+        <a onclick="showChangePassword()">Change team password</a> · 
+        <a onclick="showConfigAgain()">Change Supabase</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHANGE PASSWORD MODAL -->
+  <div class="modal-overlay" id="password-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Change Team Password</h3>
+        <button class="modal-close" onclick="closeModal('password-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Current Password</label>
+          <input type="password" id="pw-current" />
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" id="pw-new" />
+        </div>
+        <div class="form-group">
+          <label>Confirm New Password</label>
+          <input type="password" id="pw-confirm" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('password-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="changeTeamPassword()">Update Password</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status picker popup -->
+  <div id="status-picker" style="display:none;position:fixed;background:white;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 10px 25px rgba(0,0,0,0.12);z-index:300;min-width:180px;padding:6px 0">
+    <div class="status-option" data-status="Offer Sent" onclick="setStatusFromPicker('Offer Sent')">Offer Sent</div>
+    <div class="status-option" data-status="Accepted" onclick="setStatusFromPicker('Accepted')">Accepted</div>
+    <div class="status-option" data-status="Attorney Review" onclick="setStatusFromPicker('Attorney Review')">Attorney Review</div>
+    <div class="status-option" data-status="Under Contract" onclick="setStatusFromPicker('Under Contract')">Under Contract</div>
+    <div class="status-option" data-status="Closed" onclick="setStatusFromPicker('Closed')">Closed</div>
+  </div>
+  <style>
+    .status-option { padding:8px 14px; cursor:pointer; font-size:13px; }
+    .status-option:hover { background:#f1f5f9; }
+  </style>
+    <div class="spinner"></div>
+    <div>Connecting to Supabase…</div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+    <div>Connecting to Supabase…</div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="app">
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <img src="data:image/png;base64,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" alt="Moshe Rumpler" />
+          <span style="font-size:16px;font-weight:700">DealFlow</span>
+        </div>
+        <nav class="sidebar-nav">
+          <a class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span>Dashboard</span>
+          </a>
+          <a class="nav-item" data-page="clients" onclick="showPage('clients')">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            <span>Clients</span>
+          </a>
+          <a class="nav-item" data-page="transactions" onclick="showPage('transactions')">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>Transactions</span>
+          </a>
+          <a class="nav-item" data-page="tasks" onclick="showPage('tasks')">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            <span>Tasks</span>
+            <span class="badge" id="tasks-badge">0</span>
+          </a>
+        </nav>
+        <div class="sidebar-footer">
+          Live sync via Supabase<br>
+          Files stored securely
+        </div>
+      </aside>
+
+      <div class="main">
+        <header class="topbar">
+          <h1 id="page-title">Dashboard</h1>
+          <div class="topbar-actions">
+            <div class="search-box">
+              <svg width="16" height="16" fill="none" stroke="#94a3b8" stroke-width="2" viewBox="0 0 24 24" style="margin-right:8px"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              <input type="text" id="global-search" placeholder="Search clients or deals..." />
+            </div>
+            <button class="btn btn-primary" onclick="openNewModal()">+ New</button>
+            <div class="user-menu">
+              <div class="user-avatar">T</div>
+              <span>Team</span>
+              <button class="btn btn-secondary btn-sm" onclick="logout()" style="margin-left:8px">Logout</button>
+            </div>
+          </div>
+        </header>
+
+        <div class="content">
+          <div class="error-banner" id="error-banner"></div>
+
+          <!-- DASHBOARD -->
+          <div class="page active" id="page-dashboard">
+            <div class="stats">
+              <div class="stat-card">
+                <div class="label">Active Deals</div>
+                <div class="value" id="stat-deals">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="label">Open Tasks</div>
+                <div class="value" id="stat-tasks">0</div>
+                <div class="sub" id="stat-tasks-sub">0 overdue · 0 due today</div>
+              </div>
+              <div class="stat-card">
+                <div class="label">Closing in 14 days</div>
+                <div class="value" id="stat-closing">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="label">Clients</div>
+                <div class="value" id="stat-clients">0</div>
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div class="card">
+                <div class="card-header">
+                  <h2>Tasks Due Soon</h2>
+                  <button class="btn btn-secondary btn-sm" onclick="showPage('tasks')">View all</button>
+                </div>
+                <div class="card-body" id="tasks-due-soon"></div>
+              </div>
+              <div class="card">
+                <div class="card-header">
+                  <h2>Active Transactions</h2>
+                  <button class="btn btn-primary btn-sm" onclick="openDealModal()">+ Deal</button>
+                </div>
+                <div class="card-body">
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Property</th>
+                          <th>Client</th>
+                          <th>Status</th>
+                          <th>Closing</th>
+                        </tr>
+                      </thead>
+                      <tbody id="active-deals-table"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="data-section">
+              <h3>Data</h3>
+              <button class="btn btn-secondary btn-sm" onclick="exportData()">Export JSON backup</button>
+              <button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-file').click()">Import backup</button>
+              <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)" />
+              <button class="btn btn-danger btn-sm" onclick="resetDemoData()">Reset demo data</button>
+            </div>
+          </div>
+
+          <!-- CLIENTS -->
+          <div class="page" id="page-clients">
+            <div class="list-header">
+              <h2>Clients</h2>
+              <button class="btn btn-primary" onclick="openClientModal()">+ Add Client</button>
+            </div>
+            <div class="card">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Notes</th>
+                      <th style="width:100px">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="clients-table"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- TRANSACTIONS -->
+          <div class="page" id="page-transactions">
+            <div class="list-header">
+              <h2>Transactions</h2>
+              <button class="btn btn-primary" onclick="openDealModal()">+ Add Deal</button>
+            </div>
+            <div class="card">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Property</th>
+                      <th>Client</th>
+                      <th>Status</th>
+                      <th>Closing</th>
+                      <th>Files</th>
+                      <th style="width:100px">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="deals-table"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- TASKS -->
+          <div class="page" id="page-tasks">
+            <div class="list-header">
+              <h2>Tasks</h2>
+              <button class="btn btn-primary" onclick="openTaskModal()">+ Add Task</button>
+            </div>
+            <div class="card">
+              <div class="card-body" id="all-tasks-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CLIENT MODAL -->
+  <div class="modal-overlay" id="client-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="client-modal-title">Add Client</h3>
+        <button class="modal-close" onclick="closeModal('client-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="client-id" />
+        <div class="form-group">
+          <label>Name *</label>
+          <input type="text" id="client-name" placeholder="Full name or company" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="client-email" />
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="text" id="client-phone" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="client-notes" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('client-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveClient()">Save Client</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEAL MODAL (with files) -->
+  <div class="modal-overlay" id="deal-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="deal-modal-title">Add Deal</h3>
+        <button class="modal-close" onclick="closeModal('deal-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="deal-id" />
+        <div class="form-group">
+          <label>Property Address *</label>
+          <input type="text" id="deal-property" placeholder="123 Main St, City NJ" />
+        </div>
+        <div class="form-group">
+          <label>Representing *</label>
+          <select id="deal-representing">
+            <option value="Buyer">Buyer</option>
+            <option value="Seller">Seller</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Client *</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="deal-client" style="flex:1"></select>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="openClientModalFromDeal()">+ New Client</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Status</label>
+            <select id="deal-status">
+              <option value="Offer Sent">Offer Sent</option>
+              <option value="Accepted">Accepted</option>
+              <option value="Attorney Review">Attorney Review</option>
+              <option value="Under Contract">Under Contract</option>
+              <option value="Closed">Closed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Closing Date</label>
+            <input type="date" id="deal-closing" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="deal-notes" rows="2"></textarea>
+        </div>
+
+        <!-- FILES SECTION (only when editing existing deal) -->
+        <div class="files-section" id="deal-files-section" style="display:none">
+          <h4>Files</h4>
+          <div class="file-list" id="deal-file-list"></div>
+          <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+            <div>Click or drag files here to upload</div>
+            <div class="hint" style="margin-top:6px">PDF, images, Word, Excel, etc. (max 20 MB each)</div>
+            <input type="file" id="file-input" multiple onchange="handleFileUpload(event)" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('deal-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveDeal()">Save Deal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TASK MODAL -->
+  <div class="modal-overlay" id="task-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="task-modal-title">Add Task</h3>
+        <button class="modal-close" onclick="closeModal('task-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="task-id" />
+        <div class="form-group">
+          <label>Task Title *</label>
+          <input type="text" id="task-title" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Due Date</label>
+            <input type="date" id="task-due" />
+          </div>
+          <div class="form-group">
+            <label>Related Deal</label>
+            <select id="task-deal">
+              <option value="">— None —</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="task-notes" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('task-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveTask()">Save Task</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETUP HELP MODAL -->
+  <div class="modal-overlay" id="setup-modal">
+    <div class="modal" style="max-width:640px">
+      <div class="modal-header">
+        <h3>Supabase Setup Instructions</h3>
+        <button class="modal-close" onclick="closeModal('setup-modal')">&times;</button>
+      </div>
+      <div class="modal-body" style="font-size:14px;line-height:1.6">
+        <p><strong>1. Create tables</strong></p>
+        <p>Go to Supabase → SQL Editor → New query and run this:</p>
+        <pre style="background:#f1f5f9;padding:12px;border-radius:8px;font-size:12px;overflow:auto;margin:10px 0">create table if not exists clients (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  email text,
+  phone text,
+  notes text,
+  created_at timestamptz default now()
+);
+
+create table if not exists deals (
+  id uuid primary key default gen_random_uuid(),
+  property text not null,
+  client_id uuid references clients(id) on delete set null,
+  status text default 'Offer Sent',
+  closing date,
+  notes text,
+  created_at timestamptz default now()
+);
+
+create table if not exists tasks (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  due date,
+  deal_id uuid references deals(id) on delete set null,
+  done boolean default false,
+  notes text,
+  created_at timestamptz default now()
+);
+
+create table if not exists files (
+  id uuid primary key default gen_random_uuid(),
+  deal_id uuid references deals(id) on delete cascade,
+  name text not null,
+  path text not null,
+  size bigint,
+  created_at timestamptz default now()
+);
+
+create table if not exists settings (
+  key text primary key,
+  value text
+);
+
+insert into settings (key, value) values ('team_password', 'dealflow2026')
+on conflict (key) do nothing;</pre>
+
+        <p style="margin-top:16px"><strong>2. Create Storage bucket</strong></p>
+        <p>Go to Storage → New bucket → Name it <code>deal-files</code> → Make it <strong>Public</strong> (or private + policies).</p>
+
+        <p style="margin-top:16px"><strong>3. Enable RLS (simple open rules for now)</strong></p>
+        <pre style="background:#f1f5f9;padding:12px;border-radius:8px;font-size:12px;overflow:auto;margin:10px 0">alter table clients enable row level security;
+alter table deals enable row level security;
+alter table tasks enable row level security;
+alter table files enable row level security;
+alter table settings enable row level security;
+
+create policy "Allow all" on clients for all using (true) with check (true);
+create policy "Allow all" on deals for all using (true) with check (true);
+create policy "Allow all" on tasks for all using (true) with check (true);
+create policy "Allow all" on files for all using (true) with check (true);
+create policy "Allow all" on settings for all using (true) with check (true);</pre>
+
+        <p style="margin-top:12px;font-size:13px;color:var(--text-muted)">
+          These open rules are fine for a private team tool. You can tighten them later.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="closeModal('setup-modal')">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========== CONFIG ==========
+    const CONFIG_KEY = 'dealflow_sb_config';
+    const SESSION_KEY = 'dealflow_sb_session';
+    const DEFAULT_PASSWORD = 'dealflow2026';
+
+    let supabase = null;
+    let data = { clients: [], deals: [], tasks: [], files: [] };
+    let teamPassword = DEFAULT_PASSWORD;
+    let currentDealIdForFiles = null;
+
+    // ========== INIT HELPERS ==========
+    function getSavedConfig() {
+      try { return JSON.parse(localStorage.getItem(CONFIG_KEY)); } catch { return null; }
+    }
+
+    function saveSupabaseConfig() {
+      try {
+        const url = document.getElementById('sb-url').value.trim();
+        const key = document.getElementById('sb-key').value.trim();
+        if (!url || !key) return alert('Please enter both Project URL and Anon Key');
+        if (!url.includes('supabase.co')) return alert('URL should look like https://xxxxx.supabase.co');
+
+        if (typeof window.supabase === 'undefined' || !window.supabase.createClient) {
+          return alert('Supabase library has not loaded yet. Check your internet connection and refresh the page.');
+        }
+
+        const cfg = { url, key };
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+        initSupabase(cfg);
+        document.getElementById('config-screen').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'flex';
+      } catch (e) {
+        alert('Could not connect: ' + (e.message || e));
+        console.error(e);
+      }
+    }
+
+    function showConfigAgain() {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('config-screen').style.display = 'flex';
+      const cfg = getSavedConfig();
+      if (cfg) {
+        document.getElementById('sb-url').value = cfg.url || '';
+        document.getElementById('sb-key').value = cfg.key || '';
+      }
+    }
+
+    function showSetupHelp() {
+      document.getElementById('setup-modal').classList.add('open');
+    }
+
+    function initSupabase(cfg) {
+      supabase = window.supabase.createClient(cfg.url, cfg.key);
+    }
+
+    // ========== AUTH ==========
+    async function loadTeamPassword() {
+      try {
+        const { data: rows, error } = await supabase
+          .from('settings')
+          .select('value')
+          .eq('key', 'team_password')
+          .maybeSingle();
+        if (error) throw error;
+        if (rows && rows.value) {
+          teamPassword = rows.value;
+        } else {
+          // Insert default
+          await supabase.from('settings').upsert({ key: 'team_password', value: DEFAULT_PASSWORD });
+          teamPassword = DEFAULT_PASSWORD;
+        }
+      } catch (e) {
+        console.warn('Could not load team password', e);
+        teamPassword = DEFAULT_PASSWORD;
+      }
+    }
+
+    function checkPassword(pw) {
+      return pw === teamPassword;
+    }
+
+    function login(pw) {
+      if (checkPassword(pw)) {
+        sessionStorage.setItem(SESSION_KEY, 'true');
+        return true;
+      }
+      return false;
+    }
+
+    function logout() {
+      sessionStorage.removeItem(SESSION_KEY);
+      document.getElementById('app').style.display = 'none';
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('login-form').reset();
+      document.getElementById('login-error').style.display = 'none';
+    }
+
+    function showChangePassword() {
+      document.getElementById('password-modal').classList.add('open');
+      ['pw-current','pw-new','pw-confirm'].forEach(id => document.getElementById(id).value = '');
+    }
+
+    async function changeTeamPassword() {
+      const current = document.getElementById('pw-current').value;
+      const neu = document.getElementById('pw-new').value;
+      const confirm = document.getElementById('pw-confirm').value;
+      if (!checkPassword(current)) return alert('Current password is incorrect');
+      if (!neu || neu.length < 4) return alert('New password must be at least 4 characters');
+      if (neu !== confirm) return alert('Passwords do not match');
+
+      try {
+        await supabase.from('settings').upsert({ key: 'team_password', value: neu });
+        teamPassword = neu;
+        closeModal('password-modal');
+        alert('Team password updated. Share the new password with your team.');
+      } catch (e) {
+        alert('Failed to update password: ' + e.message);
+      }
+    }
+
+    // ========== DATA HELPERS ==========
+    function uid() { return crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2); }
+    function formatDate(d) {
+      if (!d) return '—';
+      const dt = new Date(d + 'T00:00:00');
+      return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    function statusClass(status) {
+      const map = {
+        'Offer Sent': 'status-offer-sent',
+        'Accepted': 'status-accepted',
+        'Offer Sent': 'status-offer-sent',
+        'Closed': 'status-closed',
+        'Under Contract': 'status-under-contract',
+        'Attorney Review': 'status-attorney-review'
+      };
+      return map[status] || 'status-offer-draft';
+    }
+    function getClientName(id) {
+      const c = data.clients.find(x => x.id === id);
+      return c ? c.name : '—';
+    }
+    function getDealProperty(id) {
+      const d = data.deals.find(x => x.id === id);
+      return d ? d.property : '';
+    }
+    function todayStr() { return new Date().toISOString().slice(0, 10); }
+    function daysFromToday(dateStr) {
+      if (!dateStr) return 999;
+      const d = new Date(dateStr + 'T00:00:00');
+      const t = new Date(); t.setHours(0,0,0,0);
+      return Math.round((d - t) / 86400000);
+    }
+    function esc(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function formatBytes(bytes) {
+      if (!bytes) return '';
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    function showLoading(show) {
+      const el = document.getElementById('loading');
+      if (el) el.classList.toggle('show', show);
+    }
+    function showError(msg) {
+      const el = document.getElementById('error-banner');
+      if (msg) {
+        el.textContent = msg;
+        el.style.display = 'block';
+      } else {
+        el.style.display = 'none';
+      }
+    }
+
+    // ========== LOAD DATA ==========
+    async function loadAllData() {
+      showLoading(true);
+      showError(null);
+      try {
+        const [clientsRes, dealsRes, tasksRes, filesRes] = await Promise.all([
+          supabase.from('clients').select('*').order('name'),
+          supabase.from('deals').select('*').order('created_at', { ascending: false }),
+          supabase.from('tasks').select('*').order('due'),
+          supabase.from('files').select('*')
+        ]);
+
+        if (clientsRes.error) throw clientsRes.error;
+        if (dealsRes.error) throw dealsRes.error;
+        if (tasksRes.error) throw tasksRes.error;
+        if (filesRes.error) throw filesRes.error;
+
+        data.clients = clientsRes.data || [];
+        data.deals = dealsRes.data || [];
+        data.tasks = tasksRes.data || [];
+        data.files = filesRes.data || [];
+
+        // Seed if completely empty
+        if (data.clients.length === 0 && data.deals.length === 0) {
+          await seedDemoData();
+          // Reload after seed
+          const [c2, d2, t2] = await Promise.all([
+            supabase.from('clients').select('*').order('name'),
+            supabase.from('deals').select('*').order('created_at', { ascending: false }),
+            supabase.from('tasks').select('*').order('due')
+          ]);
+          data.clients = c2.data || [];
+          data.deals = d2.data || [];
+          data.tasks = t2.data || [];
+        }
+
+        renderAll();
+      } catch (e) {
+        console.error(e);
+        showError('Could not load data: ' + (e.message || e) + '. Make sure you ran the setup SQL and created the tables.');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    async function seedDemoData() {
+      // Insert clients
+      const clientRows = [
+        { name: 'Jeuda Berkowitz' },
+        { name: 'Israel Eisenbach/Craft Builders' },
+        { name: 'Yossi Moskovitz' },
+        { name: 'Leah Liss' },
+        { name: 'Yehuda L Weisner' },
+        { name: 'Demo Client', email: 'demo@example.com', phone: '555-0100' }
+      ];
+      const { data: insertedClients, error: cErr } = await supabase.from('clients').insert(clientRows).select();
+      if (cErr) throw cErr;
+
+      const cMap = {};
+      insertedClients.forEach(c => { cMap[c.name] = c.id; });
+
+      const dealRows = [
+        { property: '534 Davids Ct', client_id: cMap['Jeuda Berkowitz'], status: 'Under Contract', closing: '2026-12-28' },
+        { property: '12 Blue Spruce Dr, Jackson', client_id: cMap['Israel Eisenbach/Craft Builders'], status: 'Accepted' },
+        { property: '5 Georgian Blvd, Jackson', client_id: cMap['Israel Eisenbach/Craft Builders'], status: 'Offer Sent' },
+        { property: '6 Beam Ave, Jackson', client_id: cMap['Israel Eisenbach/Craft Builders'], status: 'Offer Sent' },
+        { property: '30 Shawmont Ln, Willingboro NJ', client_id: cMap['Yossi Moskovitz'], status: 'Accepted', closing: '2026-12-28' },
+        { property: '16 Bloomfield Ln, Willingboro NJ', client_id: cMap['Leah Liss'], status: 'Attorney Review' },
+        { property: '14 Pageant Ln, Willingboro', client_id: cMap['Yehuda L Weisner'], status: 'Offer Sent' }
+      ];
+      const { data: insertedDeals, error: dErr } = await supabase.from('deals').insert(dealRows).select();
+      if (dErr) throw dErr;
+
+      const dMap = {};
+      insertedDeals.forEach(d => { dMap[d.property] = d.id; });
+
+      const taskRows = [
+        { title: 'Confirm seller signed + Attorney Review started. Record both attorneys.', due: '2026-10-29', deal_id: dMap['12 Blue Spruce Dr, Jackson'] },
+        { title: 'Follow up: Was the offer accepted?', due: '2026-10-29', deal_id: dMap['6 Beam Ave, Jackson'] },
+        { title: 'Confirm seller signed + Attorney Review started. Record both attorneys.', due: '2026-10-29', deal_id: dMap['30 Shawmont Ln, Willingboro NJ'] },
+        { title: 'Follow up: Was the offer accepted?', due: '2026-10-29', deal_id: dMap['5 Georgian Blvd, Jackson'] },
+        { title: 'Prepare Under Contract post', due: '2026-11-02', deal_id: dMap['534 Davids Ct'] },
+        { title: 'Schedule home inspection', due: '2026-11-04', deal_id: dMap['534 Davids Ct'] },
+        { title: 'Follow up: Was the offer accepted?', due: '2026-10-29', deal_id: dMap['16 Bloomfield Ln, Willingboro NJ'] },
+        { title: 'Send inspection request', due: '2026-10-28', done: false }
+      ];
+      await supabase.from('tasks').insert(taskRows);
+    }
+
+    // ========== RENDER ==========
+    function renderAll() {
+      renderStats();
+      renderTasksDueSoon();
+      renderActiveDeals();
+      renderClientsTable();
+      renderDealsTable();
+      renderAllTasks();
+      updateBadge();
+    }
+
+    function renderStats() {
+      const openTasks = data.tasks.filter(t => !t.done);
+      const today = todayStr();
+      const overdue = openTasks.filter(t => t.due && t.due < today).length;
+      const dueToday = openTasks.filter(t => t.due === today).length;
+      const activeDeals = data.deals.filter(d => d.status !== 'Closed');
+      const closingSoon = activeDeals.filter(d => {
+        if (!d.closing) return false;
+        const days = daysFromToday(d.closing);
+        return days >= 0 && days <= 14;
+      }).length;
+
+      document.getElementById('stat-deals').textContent = activeDeals.length;
+      document.getElementById('stat-tasks').textContent = openTasks.length;
+      document.getElementById('stat-tasks-sub').textContent = `${overdue} overdue · ${dueToday} due today`;
+      document.getElementById('stat-closing').textContent = closingSoon;
+      document.getElementById('stat-clients').textContent = data.clients.length;
+    }
+
+    function renderTasksDueSoon() {
+      const open = data.tasks
+        .filter(t => !t.done)
+        .sort((a, b) => (a.due || '9999') < (b.due || '9999') ? -1 : 1)
+        .slice(0, 8);
+      const el = document.getElementById('tasks-due-soon');
+      if (!open.length) {
+        el.innerHTML = '<div class="empty">No open tasks</div>';
+        return;
+      }
+      el.innerHTML = open.map(t => {
+        const dealProp = t.deal_id ? getDealProperty(t.deal_id) : '';
+        const client = t.deal_id ? getClientName(data.deals.find(d => d.id === t.deal_id)?.client_id) : '';
+        return `<div class="task-item">
+          <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTask('${t.id}')" />
+          <div class="task-content">
+            <div class="task-title">${esc(t.title)}</div>
+            <div class="task-meta">
+              ${t.due ? `<span class="task-date">${formatDate(t.due)}</span>` : ''}
+              ${dealProp ? `<span>· ${esc(dealProp)}</span>` : ''}
+              ${client ? `<span>· ${esc(client)}</span>` : ''}
+            </div>
+          </div>
+          <div class="task-actions">
+            <button class="icon-btn" onclick="openTaskModal('${t.id}')">✏️</button>
+            <button class="icon-btn" onclick="deleteTask('${t.id}')">🗑️</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function renderActiveDeals() {
+      const active = data.deals.filter(d => d.status !== 'Closed');
+      const el = document.getElementById('active-deals-table');
+      if (!active.length) {
+        el.innerHTML = '<tr><td colspan="4" class="empty">No active deals</td></tr>';
+        return;
+      }
+      el.innerHTML = active.map(d => `
+        <tr style="cursor:pointer" onclick="openDealModal('${d.id}')">
+          <td><strong>${esc(d.property)}</strong></td>
+          <td>${esc(getClientName(d.client_id))}</td>
+          <td><span class="status-badge ${statusClass(d.status)}" style="cursor:pointer" onclick="event.stopPropagation(); showStatusPicker('${d.id}', '${esc(d.status)}', event)" title="Click to change status">${esc(d.status)}</span></td>
+          <td>${formatDate(d.closing)}</td>
+        </tr>`).join('');
+    }
+
+    function renderClientsTable() {
+      const el = document.getElementById('clients-table');
+      if (!data.clients.length) {
+        el.innerHTML = '<tr><td colspan="5" class="empty">No clients yet</td></tr>';
+        return;
+      }
+      el.innerHTML = data.clients.map(c => `
+        <tr>
+          <td><strong>${esc(c.name)}</strong></td>
+          <td>${esc(c.email || '—')}</td>
+          <td>${esc(c.phone || '—')}</td>
+          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.notes || '')}</td>
+          <td>
+            <button class="icon-btn" onclick="openClientModal('${c.id}')">✏️</button>
+            <button class="icon-btn" onclick="deleteClient('${c.id}')">🗑️</button>
+          </td>
+        </tr>`).join('');
+    }
+
+    function renderDealsTable() {
+      const el = document.getElementById('deals-table');
+      if (!data.deals.length) {
+        el.innerHTML = '<tr><td colspan="6" class="empty">No deals yet</td></tr>';
+        return;
+      }
+      el.innerHTML = data.deals.map(d => {
+        const fileCount = data.files.filter(f => f.deal_id === d.id).length;
+        return `<tr>
+          <td><strong>${esc(d.property)}</strong></td>
+          <td>${esc(getClientName(d.client_id))}</td>
+          <td><span class="status-badge ${statusClass(d.status)}" style="cursor:pointer" onclick="event.stopPropagation(); showStatusPicker('${d.id}', '${esc(d.status)}', event)" title="Click to change status">${esc(d.status)}</span></td>
+          <td>${formatDate(d.closing)}</td>
+          <td>${fileCount ? fileCount + ' file' + (fileCount > 1 ? 's' : '') : '—'}</td>
+          <td>
+            <button class="icon-btn" onclick="openDealModal('${d.id}')">✏️</button>
+            <button class="icon-btn" onclick="deleteDeal('${d.id}')">🗑️</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderAllTasks() {
+      const sorted = [...data.tasks].sort((a, b) => {
+        if (a.done !== b.done) return a.done ? 1 : -1;
+        return (a.due || '9999') < (b.due || '9999') ? -1 : 1;
+      });
+      const el = document.getElementById('all-tasks-list');
+      if (!sorted.length) {
+        el.innerHTML = '<div class="empty">No tasks yet</div>';
+        return;
+      }
+      el.innerHTML = sorted.map(t => {
+        const dealProp = t.deal_id ? getDealProperty(t.deal_id) : '';
+        const client = t.deal_id ? getClientName(data.deals.find(d => d.id === t.deal_id)?.client_id) : '';
+        return `<div class="task-item" style="${t.done ? 'opacity:0.55' : ''}">
+          <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTask('${t.id}')" />
+          <div class="task-content">
+            <div class="task-title" style="${t.done ? 'text-decoration:line-through' : ''}">${esc(t.title)}</div>
+            <div class="task-meta">
+              ${t.due ? `<span class="task-date">${formatDate(t.due)}</span>` : ''}
+              ${dealProp ? `<span>· ${esc(dealProp)}</span>` : ''}
+              ${client ? `<span>· ${esc(client)}</span>` : ''}
+            </div>
+          </div>
+          <div class="task-actions">
+            <button class="icon-btn" onclick="openTaskModal('${t.id}')">✏️</button>
+            <button class="icon-btn" onclick="deleteTask('${t.id}')">🗑️</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function updateBadge() {
+      const count = data.tasks.filter(t => !t.done).length;
+      const badge = document.getElementById('tasks-badge');
+      badge.textContent = count;
+      badge.style.display = count ? 'inline' : 'none';
+    }
+
+    // ========== NAV ==========
+    let statusPickerDealId = null;
+
+    function showStatusPicker(dealId, currentStatus, event) {
+      event.stopPropagation();
+      event.preventDefault();
+      statusPickerDealId = dealId;
+      const picker = document.getElementById('status-picker');
+      if (!picker) return;
+      document.body.appendChild(picker); // ensure it's at the top level
+      picker.style.display = 'block';
+      picker.style.position = 'fixed';
+      picker.style.left = Math.max(10, Math.min(event.clientX - 30, window.innerWidth - 190)) + 'px';
+      picker.style.top = (event.clientY + 5) + 'px';
+      picker.style.zIndex = '9999';
+      picker.querySelectorAll('.status-option').forEach(el => {
+        el.style.fontWeight = el.dataset.status === currentStatus ? '700' : '400';
+        el.style.background = el.dataset.status === currentStatus ? '#dbeafe' : '';
+      });
+      window._statusPickerJustOpened = true;
+      setTimeout(() => { window._statusPickerJustOpened = false; }, 150);
+    }
+
+    async function setStatusFromPicker(newStatus) {
+      document.getElementById('status-picker').style.display = 'none';
+      if (!statusPickerDealId) return;
+      try {
+        const { error } = await supabase.from('deals').update({ status: newStatus }).eq('id', statusPickerDealId);
+        if (error) throw error;
+        await loadAllData();
+      } catch (e) {
+        alert('Could not update status: ' + (e.message || e));
+      }
+      statusPickerDealId = null;
+    }
+
+    document.addEventListener('click', (e) => {
+      const p = document.getElementById('status-picker');
+      if (!p) return;
+      if (window._statusPickerJustOpened) {
+        window._statusPickerJustOpened = false;
+        return;
+      }
+      if (!p.contains(e.target)) p.style.display = 'none';
+    });
+
+    function showPage(page) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById('page-' + page).classList.add('active');
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
+      const titles = { dashboard: 'Dashboard', clients: 'Clients', transactions: 'Transactions', tasks: 'Tasks' };
+      document.getElementById('page-title').textContent = titles[page] || page;
+    }
+    function openNewModal() {
+      const page = document.querySelector('.page.active').id.replace('page-', '');
+      if (page === 'clients') openClientModal();
+      else if (page === 'tasks') openTaskModal();
+      else openDealModal();
+    }
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      el.classList.remove('open');
+      if (id === 'client-modal') el.style.zIndex = '';
+    }
+
+    // ========== CLIENTS CRUD ==========
+    function openClientModal(id) {
+      document.getElementById('client-id').value = id || '';
+      document.getElementById('client-modal-title').textContent = id ? 'Edit Client' : 'Add Client';
+      if (id) {
+        const c = data.clients.find(x => x.id === id);
+        document.getElementById('client-name').value = c?.name || '';
+        document.getElementById('client-email').value = c?.email || '';
+        document.getElementById('client-phone').value = c?.phone || '';
+        document.getElementById('client-notes').value = c?.notes || '';
+      } else {
+        ['client-name','client-email','client-phone','client-notes'].forEach(id => document.getElementById(id).value = '');
+      }
+      document.getElementById('client-modal').classList.add('open');
+    }
+
+    function openClientModalFromDeal() {
+      // Remember we came from the deal modal
+      window._fromDealModal = true;
+      // Open client modal on top
+      document.getElementById('client-modal').style.zIndex = '200';
+      openClientModal();
+    }
+
+    // Update saveClient to refresh the deal client list if needed
+    const originalSaveClient = saveClient;
+    async function saveClient() {
+      const id = document.getElementById('client-id').value;
+      const name = document.getElementById('client-name').value.trim();
+      if (!name) return alert('Name is required');
+      const obj = {
+        name,
+        email: document.getElementById('client-email').value.trim() || null,
+        phone: document.getElementById('client-phone').value.trim() || null,
+        notes: document.getElementById('client-notes').value.trim() || null
+      };
+      try {
+        let newId = id;
+        if (id) {
+          const { error } = await supabase.from('clients').update(obj).eq('id', id);
+          if (error) throw error;
+        } else {
+          const { data: inserted, error } = await supabase.from('clients').insert(obj).select().single();
+          if (error) throw error;
+          newId = inserted.id;
+        }
+        closeModal('client-modal');
+        await loadAllData();
+
+        // If we came from the deal modal, refresh the select and pick the new client
+        if (window._fromDealModal) {
+          populateClientSelect(newId);
+          document.getElementById('deal-client').value = newId;
+          window._fromDealModal = false;
+        }
+      } catch (e) {
+        const msg = e.message || JSON.stringify(e);
+        if (msg.includes('user_id') && msg.includes('not-null')) {
+          alert('Database needs a quick fix. Run this SQL in Supabase:\n\nalter table clients alter column user_id drop not null;');
+        } else {
+          alert('Error saving client: ' + msg);
+        }
+        console.error(e);
+      }
+    }
+
+    async function deleteClient(id) {
+      if (!confirm('Delete this client?')) return;
+      try {
+        const { error } = await supabase.from('clients').delete().eq('id', id);
+        if (error) throw error;
+        await loadAllData();
+      } catch (e) {
+        alert('Error deleting: ' + e.message);
+      }
+    }
+
+    // ========== DEALS CRUD + FILES ==========
+    function populateClientSelect(selectedId) {
+      const sel = document.getElementById('deal-client');
+      sel.innerHTML = data.clients.map(c =>
+        `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${esc(c.name)}</option>`
+      ).join('') || '<option value="">No clients yet</option>';
+    }
+
+    function openDealModal(id) {
+      document.getElementById('deal-id').value = id || '';
+      document.getElementById('deal-modal-title').textContent = id ? 'Edit Deal' : 'Add Deal';
+      populateClientSelect();
+      currentDealIdForFiles = id || null;
+
+      const filesSection = document.getElementById('deal-files-section');
+      if (id) {
+        const d = data.deals.find(x => x.id === id);
+        document.getElementById('deal-property').value = d?.property || '';
+        document.getElementById('deal-representing').value = d?.representing || 'Buyer';
+        document.getElementById('deal-client').value = d?.client_id || '';
+        document.getElementById('deal-status').value = d?.status || 'Offer Sent';
+        document.getElementById('deal-closing').value = d?.closing || '';
+        document.getElementById('deal-notes').value = d?.notes || '';
+        filesSection.style.display = 'block';
+        renderDealFiles(id);
+      } else {
+        document.getElementById('deal-property').value = '';
+        document.getElementById('deal-representing').value = 'Buyer';
+        document.getElementById('deal-status').value = 'Offer Sent';
+        document.getElementById('deal-closing').value = '';
+        document.getElementById('deal-notes').value = '';
+        filesSection.style.display = 'none';
+      }
+      document.getElementById('deal-modal').classList.add('open');
+    }
+
+    function renderDealFiles(dealId) {
+      const files = data.files.filter(f => f.deal_id === dealId);
+      const el = document.getElementById('deal-file-list');
+      if (!files.length) {
+        el.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px 0">No files yet</div>';
+        return;
+      }
+      el.innerHTML = files.map(f => `
+        <div class="file-item">
+          <span class="file-name" title="${esc(f.name)}">${esc(f.name)}</span>
+          <span class="file-size">${formatBytes(f.size)}</span>
+          <button class="btn btn-secondary btn-sm" onclick="downloadFile('${f.id}', '${esc(f.name)}', '${esc(f.path)}')">Download</button>
+          <button class="icon-btn" onclick="deleteFile('${f.id}', '${esc(f.path)}')" title="Delete">🗑️</button>
+        </div>
+      `).join('');
+    }
+
+    async function saveDeal() {
+      const id = document.getElementById('deal-id').value;
+      const property = document.getElementById('deal-property').value.trim();
+      const representing = document.getElementById('deal-representing').value;
+      const client_id = document.getElementById('deal-client').value;
+      if (!property) return alert('Property address is required');
+      if (!client_id) return alert('Please select a client');
+
+      const obj = {
+        property,
+        representing,
+        client_id,
+        status: document.getElementById('deal-status').value,
+        closing: document.getElementById('deal-closing').value || null,
+        notes: document.getElementById('deal-notes').value.trim() || null
+      };
+
+      try {
+        let dealId = id;
+        if (id) {
+          const { error } = await supabase.from('deals').update(obj).eq('id', id);
+          if (error) throw error;
+        } else {
+          const { data: inserted, error } = await supabase.from('deals').insert(obj).select().single();
+          if (error) throw error;
+          dealId = inserted.id;
+          currentDealIdForFiles = dealId;
+
+          // Auto-create the correct task list
+          const today = todayStr();
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+
+          let taskRows = [];
+          if (representing === 'Buyer') {
+            taskRows = [
+              { title: 'Follow up: Was the offer accepted?', due: today, deal_id: dealId },
+              { title: 'Confirm seller signed + Attorney Review started. Record both attorneys.', due: today, deal_id: dealId },
+              { title: 'Schedule home inspection', due: tomorrowStr, deal_id: dealId }
+            ];
+          } else {
+            taskRows = [
+              { title: 'Prepare listing agreement', due: today, deal_id: dealId },
+              { title: 'Get contact info for seller / management / tenant', due: today, deal_id: dealId },
+              { title: 'Follow up 24 hours later to see if the LA was signed', due: tomorrowStr, deal_id: dealId },
+              { title: 'If LA signed: schedule photography', due: tomorrowStr, deal_id: dealId },
+              { title: 'Prepare the listing on the MLS', due: tomorrowStr, deal_id: dealId },
+              { title: 'List it', due: tomorrowStr, deal_id: dealId }
+            ];
+          }
+          if (taskRows.length) {
+            await supabase.from('tasks').insert(taskRows);
+          }
+        }
+        closeModal('deal-modal');
+        await loadAllData();
+      } catch (e) {
+        alert('Error saving deal: ' + e.message);
+      }
+    }
+
+    async function deleteDeal(id) {
+      if (!confirm('Delete this deal and all its files?')) return;
+      try {
+        // Delete files from storage first
+        const files = data.files.filter(f => f.deal_id === id);
+        for (const f of files) {
+          await supabase.storage.from('deal-files').remove([f.path]);
+        }
+        const { error } = await supabase.from('deals').delete().eq('id', id);
+        if (error) throw error;
+        await loadAllData();
+      } catch (e) {
+        alert('Error deleting: ' + e.message);
+      }
+    }
+
+    // ========== FILE UPLOAD / DOWNLOAD ==========
+    async function handleFileUpload(event) {
+      const files = Array.from(event.target.files || []);
+      if (!files.length || !currentDealIdForFiles) return;
+
+      showLoading(true);
+      try {
+        for (const file of files) {
+          if (file.size > 20 * 1024 * 1024) {
+            alert(`${file.name} is larger than 20 MB and was skipped.`);
+            continue;
+          }
+          const ext = file.name.split('.').pop();
+          const path = `${currentDealIdForFiles}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+          const { error: upErr } = await supabase.storage
+            .from('deal-files')
+            .upload(path, file, { cacheControl: '3600', upsert: false });
+          if (upErr) throw upErr;
+
+          const { error: metaErr } = await supabase.from('files').insert({
+            deal_id: currentDealIdForFiles,
+            name: file.name,
+            path: path,
+            size: file.size
+          });
+          if (metaErr) throw metaErr;
+        }
+        // Refresh files list
+        const { data: newFiles } = await supabase.from('files').select('*').eq('deal_id', currentDealIdForFiles);
+        data.files = data.files.filter(f => f.deal_id !== currentDealIdForFiles).concat(newFiles || []);
+        renderDealFiles(currentDealIdForFiles);
+        renderDealsTable(); // update file counts
+      } catch (e) {
+        console.error(e);
+        alert('Upload failed: ' + (e.message || e) + '\n\nMake sure you created the "deal-files" storage bucket.');
+      } finally {
+        showLoading(false);
+        event.target.value = '';
+      }
+    }
+
+    async function downloadFile(id, name, path) {
+      try {
+        const { data: blob, error } = await supabase.storage.from('deal-files').download(path);
+        if (error) throw error;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert('Download failed: ' + e.message);
+      }
+    }
+
+    async function deleteFile(id, path) {
+      if (!confirm('Delete this file?')) return;
+      try {
+        await supabase.storage.from('deal-files').remove([path]);
+        await supabase.from('files').delete().eq('id', id);
+        data.files = data.files.filter(f => f.id !== id);
+        if (currentDealIdForFiles) renderDealFiles(currentDealIdForFiles);
+        renderDealsTable();
+      } catch (e) {
+        alert('Delete failed: ' + e.message);
+      }
+    }
+
+    // Drag and drop support
+    const uploadZone = document.getElementById('upload-zone');
+    if (uploadZone) {
+      uploadZone.addEventListener('dragover', e => {
+        e.preventDefault();
+        uploadZone.classList.add('dragover');
+      });
+      uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+      uploadZone.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+        const dt = e.dataTransfer;
+        if (dt && dt.files.length) {
+          handleFileUpload({ target: { files: dt.files, value: '' } });
+        }
+      });
+    }
+
+    // ========== TASKS CRUD ==========
+    function populateDealSelect(selectedId) {
+      const sel = document.getElementById('task-deal');
+      sel.innerHTML = '<option value="">— None —</option>' +
+        data.deals.map(d =>
+          `<option value="${d.id}" ${d.id === selectedId ? 'selected' : ''}>${esc(d.property)}</option>`
+        ).join('');
+    }
+
+    function openTaskModal(id) {
+      document.getElementById('task-id').value = id || '';
+      document.getElementById('task-modal-title').textContent = id ? 'Edit Task' : 'Add Task';
+      populateDealSelect();
+      if (id) {
+        const t = data.tasks.find(x => x.id === id);
+        document.getElementById('task-title').value = t?.title || '';
+        document.getElementById('task-due').value = t?.due || '';
+        document.getElementById('task-deal').value = t?.deal_id || '';
+        document.getElementById('task-notes').value = t?.notes || '';
+      } else {
+        document.getElementById('task-title').value = '';
+        document.getElementById('task-due').value = todayStr();
+        document.getElementById('task-deal').value = '';
+        document.getElementById('task-notes').value = '';
+      }
+      document.getElementById('task-modal').classList.add('open');
+    }
+
+    async function saveTask() {
+      const id = document.getElementById('task-id').value;
+      const title = document.getElementById('task-title').value.trim();
+      if (!title) return alert('Task title is required');
+      const obj = {
+        title,
+        due: document.getElementById('task-due').value || null,
+        deal_id: document.getElementById('task-deal').value || null,
+        notes: document.getElementById('task-notes').value.trim() || null,
+        done: id ? (data.tasks.find(t => t.id === id)?.done || false) : false
+      };
+      try {
+        if (id) {
+          const { error } = await supabase.from('tasks').update(obj).eq('id', id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('tasks').insert(obj);
+          if (error) throw error;
+        }
+        closeModal('task-modal');
+        await loadAllData();
+      } catch (e) {
+        alert('Error saving task: ' + e.message);
+      }
+    }
+
+    async function toggleTask(id) {
+      const t = data.tasks.find(x => x.id === id);
+      if (!t) return;
+      const newDone = !t.done;
+      try {
+        const { error } = await supabase.from('tasks').update({ done: newDone }).eq('id', id);
+        if (error) throw error;
+
+        // Auto-advance deal status based on task title when marked done
+        if (newDone && t.deal_id) {
+          const title = (t.title || '').toLowerCase();
+          let newStatus = null;
+          if (title.includes('offer accepted') || title.includes('was the offer accepted')) newStatus = 'Accepted';
+          else if (title.includes('attorney') || title.includes('seller signed')) newStatus = 'Attorney Review';
+          else if (title.includes('under contract') || title.includes('inspection')) newStatus = 'Under Contract';
+          else if (title.includes('closed') || title.includes('closing')) newStatus = 'Closed';
+
+          if (newStatus) {
+            await supabase.from('deals').update({ status: newStatus }).eq('id', t.deal_id);
+          }
+        }
+
+        await loadAllData();
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function deleteTask(id) {
+      if (!confirm('Delete this task?')) return;
+      try {
+        const { error } = await supabase.from('tasks').delete().eq('id', id);
+        if (error) throw error;
+        await loadAllData();
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    // ========== IMPORT / EXPORT ==========
+    function exportData() {
+      const blob = new Blob([JSON.stringify({ clients: data.clients, deals: data.deals, tasks: data.tasks }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `dealflow-backup-${todayStr()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function importData(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async function(ev) {
+        try {
+          const imported = JSON.parse(ev.target.result);
+          if (!imported.clients || !imported.deals || !imported.tasks) throw new Error('Invalid format');
+          if (!confirm('This will replace all current data. Continue?')) return;
+
+          // Simple approach: delete all then insert
+          await supabase.from('tasks').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('files').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('deals').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('clients').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
+          // Note: IDs may not match, so we insert without preserving IDs for simplicity
+          // (or you can map them if needed)
+          alert('Import of structure is limited in this version. Prefer using the live app. Demo data can be reset instead.');
+          await loadAllData();
+        } catch (err) {
+          alert('Import failed: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    }
+
+    async function resetDemoData() {
+      if (!confirm('Reset to the original demo data? All current deals, tasks and files will be deleted.')) return;
+      try {
+        showLoading(true);
+        // Clear storage files
+        const { data: allFiles } = await supabase.from('files').select('path');
+        if (allFiles && allFiles.length) {
+          await supabase.storage.from('deal-files').remove(allFiles.map(f => f.path));
+        }
+        await supabase.from('files').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('tasks').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('deals').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('clients').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await seedDemoData();
+        await loadAllData();
+        alert('Demo data restored.');
+      } catch (e) {
+        alert('Reset failed: ' + e.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // ========== BOOT ==========
+    document.getElementById('login-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const pass = document.getElementById('login-pass').value;
+      document.getElementById('login-error').style.display = 'none';
+      if (login(pass)) {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        await loadTeamPassword();
+        await loadAllData();
+      } else {
+        document.getElementById('login-error').style.display = 'block';
+      }
+    });
+
+    (function init() {
+      try {
+        // Show library status
+        const statusEl = document.getElementById('lib-status');
+        if (statusEl) {
+          if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+            statusEl.textContent = 'Supabase library loaded ✓';
+            statusEl.style.color = '#047857';
+          } else {
+            statusEl.textContent = 'Waiting for Supabase library… (refresh if it stays here)';
+            statusEl.style.color = '#b45309';
+            // Keep checking for a few seconds
+            let tries = 0;
+            const interval = setInterval(() => {
+              tries++;
+              if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+                statusEl.textContent = 'Supabase library loaded ✓';
+                statusEl.style.color = '#047857';
+                clearInterval(interval);
+                // Re-run init logic if needed
+                location.reload();
+              } else if (tries > 10) {
+                statusEl.textContent = 'Library failed to load. Refresh the page or try another browser.';
+                statusEl.style.color = '#b91c1c';
+                clearInterval(interval);
+              }
+            }, 1000);
+          }
+        }
+
+        const cfg = getSavedConfig();
+        if (cfg && cfg.url && cfg.key) {
+          // Only init if the library loaded
+          if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+            initSupabase(cfg);
+            document.getElementById('config-screen').style.display = 'none';
+            document.getElementById('login-screen').style.display = 'flex';
+
+            // Restore session
+            if (sessionStorage.getItem(SESSION_KEY) === 'true') {
+              document.getElementById('login-screen').style.display = 'none';
+              document.getElementById('app').style.display = 'block';
+              loadTeamPassword().then(() => loadAllData()).catch(err => {
+                console.error(err);
+                showError('Failed to load data. Check your Supabase connection.');
+              });
+            }
+          } else {
+            document.getElementById('config-screen').style.display = 'flex';
+            document.getElementById('login-screen').style.display = 'none';
+          }
+        } else {
+          document.getElementById('config-screen').style.display = 'flex';
+          document.getElementById('login-screen').style.display = 'none';
+        }
+      } catch (e) {
+        console.error('Init error', e);
+        document.getElementById('config-screen').style.display = 'flex';
+        document.getElementById('login-screen').style.display = 'none';
+      }
+    })();
+  </script>
+</body>
+</html>
