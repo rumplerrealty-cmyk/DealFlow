@@ -1440,7 +1440,10 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
         renderAll();
       } catch (e) {
         console.error(e);
-        showError('Could not load data: ' + (e.message || e) + '. Make sure you ran the setup SQL and created the tables.');
+        const msg = e.message || String(e);
+        if (!msg.includes('innerHTML') && !msg.includes('null')) {
+          showError('Could not load data: ' + msg);
+        }
       } finally {
         showLoading(false);
       }
@@ -1523,6 +1526,20 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
     }
 
     function renderAll() {
+      try {
+        renderStats();
+        renderTasksDueSoon();
+        renderDashboardMessages();
+        renderActiveDeals();
+        renderClientsTable();
+        renderDealsTable();
+        renderAllTasks();
+        renderMessages();
+        updateBadge();
+      } catch (e) {
+        console.error('Render error', e);
+      }
+    }
       renderStats();
       renderTasksDueSoon();
       renderDashboardMessages();
@@ -1554,6 +1571,58 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
     }
 
     function renderTasksDueSoon() {
+      const el = document.getElementById('tasks-due-soon');
+      if (!el) return;
+      const open = data.tasks
+        .filter(t => !t.done)
+        .sort((a, b) => (a.due || '9999') < (b.due || '9999') ? -1 : 1)
+        .slice(0, 8);
+      if (!open.length) {
+        el.innerHTML = '<div class="empty">No open tasks</div>';
+        return;
+      }
+      el.innerHTML = open.map(t => {
+        const dealProp = t.deal_id ? getDealProperty(t.deal_id) : '';
+        const client = t.deal_id ? getClientName(data.deals.find(d => d.id === t.deal_id)?.client_id) : '';
+        return `<div class="task-item">
+          <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTask('${t.id}')" />
+          <div class="task-content">
+            <div class="task-title">${esc(t.title)}</div>
+            <div class="task-meta">
+              ${t.due ? `<span class="task-date">${formatDate(t.due)}</span>` : ''}
+              ${dealProp ? `<span>· ${esc(dealProp)}</span>` : ''}
+              ${client ? `<span>· ${esc(client)}</span>` : ''}
+            </div>
+          </div>
+          <div class="task-actions">
+            <button class="icon-btn" onclick="openTaskModal('${t.id}')">✏️</button>
+            <button class="icon-btn" onclick="deleteTask('${t.id}')">🗑️</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function renderDashboardMessages() {
+      const el = document.getElementById('dashboard-messages');
+      if (!el) return;
+      const recent = (data.messages || []).slice(0, 5);
+      if (!recent.length) {
+        el.innerHTML = '<div class="empty">No messages yet</div>';
+        return;
+      }
+      el.innerHTML = recent.map(m => {
+        const related = m.deal_id ? getDealProperty(m.deal_id) : (m.related_text || 'General');
+        return `<div class="task-item">
+          <div class="task-content">
+            <div class="task-title">${esc(m.text)}</div>
+            <div class="task-meta">
+              <span>${related}</span>
+              <span>· ${new Date(m.created_at).toLocaleString()}</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
       const open = data.tasks
         .filter(t => !t.done)
         .sort((a, b) => (a.due || '9999') < (b.due || '9999') ? -1 : 1)
