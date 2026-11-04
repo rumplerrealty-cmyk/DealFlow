@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DealFlow (Supabase)</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#3b82f6">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -621,18 +623,28 @@
       .grid-2 { grid-template-columns: 1fr; }
     }
     @media (max-width: 768px) {
-      .sidebar { width: 70px; }
-      .sidebar-brand span + span,
-      .nav-item span:not(.badge),
-      .sidebar-footer { display: none; }
-      .sidebar-brand { justify-content: center; padding: 18px 0; }
-      .nav-item { justify-content: center; padding: 14px; }
-      .main { margin-left: 70px; }
+      .sidebar { 
+        width: 0; 
+        overflow: hidden;
+        transition: width 0.2s;
+        position: fixed;
+        z-index: 100;
+        height: 100vh;
+      }
+      .sidebar.open { width: 220px; }
+      .main { margin-left: 0; }
       .stats { grid-template-columns: 1fr 1fr; }
       .topbar { padding: 12px 16px; }
       .content { padding: 16px; }
       .search-box { display: none; }
       .form-row { grid-template-columns: 1fr; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .topbar h1 { font-size: 18px; }
+      #menu-btn { display: inline-flex !important; }
+    }
+    @media (max-width: 480px) {
+      .stats { grid-template-columns: 1fr; }
+      .stat-card .value { font-size: 28px; }
     }
   </style>
 </head>
@@ -759,6 +771,10 @@
             <span>Tasks</span>
             <span class="badge" id="tasks-badge">0</span>
           </a>
+          <a class="nav-item" data-page="communication" onclick="showPage('communication')">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            <span>Communication</span>
+          </a>
         </nav>
         <div class="sidebar-footer">
           Live sync via Supabase<br>
@@ -768,7 +784,10 @@
 
       <div class="main">
         <header class="topbar">
-          <h1 id="page-title">Dashboard</h1>
+          <div style="display:flex;align-items:center;gap:12px">
+            <button class="btn btn-secondary btn-sm" id="menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('open')" style="display:none">☰</button>
+            <h1 id="page-title">Dashboard</h1>
+          </div>
           <div class="topbar-actions">
             <div class="search-box">
               <svg width="16" height="16" fill="none" stroke="#94a3b8" stroke-width="2" viewBox="0 0 24 24" style="margin-right:8px"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
@@ -905,6 +924,17 @@
             </div>
             <div class="card">
               <div class="card-body" id="all-tasks-list"></div>
+            </div>
+          </div>
+
+          <!-- COMMUNICATION -->
+          <div class="page" id="page-communication">
+            <div class="list-header">
+              <h2>Communication</h2>
+              <button class="btn btn-primary" onclick="openMessageModal()">+ New Message</button>
+            </div>
+            <div class="card">
+              <div class="card-body" id="messages-list"></div>
             </div>
           </div>
         </div>
@@ -1051,7 +1081,31 @@
     </div>
   </div>
 
-  <!-- SETUP HELP MODAL -->
+  <!-- MESSAGE MODAL -->
+  <div class="modal-overlay" id="message-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>New Message</h3>
+        <button class="modal-close" onclick="closeModal('message-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Related to</label>
+          <select id="msg-related">
+            <option value="">— General —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Message *</label>
+          <textarea id="msg-text" rows="4" placeholder="Type your message..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('message-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveMessage()">Send</button>
+      </div>
+    </div>
+  </div>
   <div class="modal-overlay" id="setup-modal">
     <div class="modal" style="max-width:640px">
       <div class="modal-header">
@@ -1140,7 +1194,7 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
     const DEFAULT_PASSWORD = 'dealflow2026';
 
     let supabase = null;
-    let data = { clients: [], deals: [], tasks: [], files: [] };
+    let data = { clients: [], deals: [], tasks: [], files: [], messages: [] };
     let teamPassword = DEFAULT_PASSWORD;
     let currentDealIdForFiles = null;
 
@@ -1317,17 +1371,20 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
       showLoading(true);
       showError(null);
       try {
-        const [clientsRes, dealsRes, tasksRes, filesRes] = await Promise.all([
+        const [clientsRes, dealsRes, tasksRes, filesRes, messagesRes] = await Promise.all([
           supabase.from('clients').select('*').order('name'),
           supabase.from('deals').select('*').order('created_at', { ascending: false }),
           supabase.from('tasks').select('*').order('due'),
-          supabase.from('files').select('*')
+          supabase.from('files').select('*'),
+          supabase.from('messages').select('*').order('created_at', { ascending: false })
         ]);
 
         if (clientsRes.error) throw clientsRes.error;
         if (dealsRes.error) throw dealsRes.error;
         if (tasksRes.error) throw tasksRes.error;
         if (filesRes.error) throw filesRes.error;
+        // messages table may not exist yet
+        data.messages = messagesRes.error ? [] : (messagesRes.data || []);
 
         data.clients = clientsRes.data || [];
         data.deals = dealsRes.data || [];
@@ -1409,6 +1466,7 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
       renderClientsTable();
       renderDealsTable();
       renderAllTasks();
+      renderMessages();
       updateBadge();
     }
 
@@ -1550,7 +1608,50 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
       }).join('');
     }
 
-    function updateBadge() {
+    function renderMessages() {
+      const el = document.getElementById('messages-list');
+      if (!el) return;
+      if (!data.messages.length) {
+        el.innerHTML = '<div class="empty">No messages yet</div>';
+        return;
+      }
+      el.innerHTML = data.messages.map(m => {
+        const related = m.deal_id ? getDealProperty(m.deal_id) : (m.task_id ? 'Task' : 'General');
+        return `<div class="task-item">
+          <div class="task-content">
+            <div class="task-title">${esc(m.text)}</div>
+            <div class="task-meta">
+              <span>${related}</span>
+              <span>· ${new Date(m.created_at).toLocaleString()}</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function openMessageModal() {
+      const sel = document.getElementById('msg-related');
+      sel.innerHTML = '<option value="">— General —</option>' +
+        data.deals.map(d => `<option value="deal:${d.id}">${esc(d.property)}</option>`).join('');
+      document.getElementById('msg-text').value = '';
+      document.getElementById('message-modal').classList.add('open');
+    }
+
+    async function saveMessage() {
+      const text = document.getElementById('msg-text').value.trim();
+      if (!text) return alert('Message is required');
+      const related = document.getElementById('msg-related').value;
+      const obj = { text, created_at: new Date().toISOString() };
+      if (related.startsWith('deal:')) obj.deal_id = related.split(':')[1];
+      try {
+        const { error } = await supabase.from('messages').insert(obj);
+        if (error) throw error;
+        closeModal('message-modal');
+        await loadAllData();
+      } catch (e) {
+        alert('Could not send message. Make sure the messages table exists.\n\n' + (e.message || e));
+      }
+    }
       const count = data.tasks.filter(t => !t.done).length;
       const badge = document.getElementById('tasks-badge');
       badge.textContent = count;
@@ -2132,6 +2233,11 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
         document.getElementById('login-screen').style.display = 'none';
       }
     })();
+
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
   </script>
 </body>
 </html>
