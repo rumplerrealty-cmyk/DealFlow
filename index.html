@@ -11,14 +11,18 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
   <script>
-    // Quick fallback
-    setTimeout(function() {
-      if (typeof window.supabase === 'undefined') {
-        const s = document.createElement('script');
-        s.src = 'https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
-        document.head.appendChild(s);
+    function doLogin() {
+      var pass = document.getElementById('login-pass').value;
+      if (pass === 'dealflow2026') {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        if (typeof loadAllData === 'function') {
+          loadAllData();
+        }
+      } else {
+        alert('Wrong password. Use dealflow2026');
       }
-    }, 2000);
+    }
   </script>
   <script>
     // Fallback to unpkg if jsdelivr is slow/blocked
@@ -690,12 +694,12 @@
         <span class="sync-badge"><span class="sync-dot"></span> Supabase live sync</span>
       </p>
       <div class="login-error" id="login-error">Incorrect team password</div>
-      <form id="login-form">
+      <form id="login-form" onsubmit="return false;">
         <div class="form-group">
           <label>Team Password</label>
           <input type="password" id="login-pass" placeholder="Enter team password" required />
         </div>
-        <button type="submit" class="btn btn-primary btn-block">Enter DealFlow</button>
+        <button type="button" class="btn btn-primary btn-block" onclick="doLogin()">Enter DealFlow</button>
       </form>
       <div class="login-footer">
         Default password: <strong>dealflow2026</strong><br>
@@ -1100,10 +1104,9 @@
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label>Related to</label>
-          <select id="msg-related">
-            <option value="">— General —</option>
-          </select>
+          <label>Related transaction (optional)</label>
+          <input type="text" id="msg-related-text" placeholder="Type property address or deal name..." list="deal-suggestions" />
+          <datalist id="deal-suggestions"></datalist>
         </div>
         <div class="form-group">
           <label>Message *</label>
@@ -1279,12 +1282,23 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
       return pw === 'dealflow2026' || pw === teamPassword;
     }
 
-    function login(pw) {
-      if (checkPassword(pw)) {
+    function doLogin() {
+      const pass = document.getElementById('login-pass').value;
+      document.getElementById('login-error').style.display = 'none';
+      if (pass === 'dealflow2026') {
         sessionStorage.setItem(SESSION_KEY, 'true');
-        return true;
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        // Load existing data from Supabase
+        if (typeof loadTeamPassword === 'function') {
+          loadTeamPassword().then(() => loadAllData()).catch(err => {
+            console.error(err);
+            showError('Could not load data. Your deals are still safe in Supabase.');
+          });
+        }
+      } else {
+        document.getElementById('login-error').style.display = 'block';
       }
-      return false;
     }
 
     function logout() {
@@ -1469,6 +1483,15 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
     }
 
     // ========== RENDER ==========
+    function updateBadge() {
+      const count = data.tasks.filter(t => !t.done).length;
+      const badge = document.getElementById('tasks-badge');
+      if (badge) {
+        badge.textContent = count;
+        badge.style.display = count ? 'inline' : 'none';
+      }
+    }
+
     function renderAll() {
       renderStats();
       renderTasksDueSoon();
@@ -1626,7 +1649,7 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
         return;
       }
       el.innerHTML = data.messages.map(m => {
-        const related = m.deal_id ? getDealProperty(m.deal_id) : (m.task_id ? 'Task' : 'General');
+        const related = m.deal_id ? getDealProperty(m.deal_id) : (m.related_text || 'General');
         return `<div class="task-item">
           <div class="task-content">
             <div class="task-title">${esc(m.text)}</div>
@@ -1640,9 +1663,11 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
     }
 
     function openMessageModal() {
-      const sel = document.getElementById('msg-related');
-      sel.innerHTML = '<option value="">— General —</option>' +
-        data.deals.map(d => `<option value="deal:${d.id}">${esc(d.property)}</option>`).join('');
+      const datalist = document.getElementById('deal-suggestions');
+      if (datalist) {
+        datalist.innerHTML = data.deals.map(d => `<option value="${esc(d.property)}">`).join('');
+      }
+      document.getElementById('msg-related-text').value = '';
       document.getElementById('msg-text').value = '';
       document.getElementById('message-modal').classList.add('open');
     }
@@ -1650,9 +1675,13 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
     async function saveMessage() {
       const text = document.getElementById('msg-text').value.trim();
       if (!text) return alert('Message is required');
-      const related = document.getElementById('msg-related').value;
+      const relatedText = document.getElementById('msg-related-text').value.trim();
       const obj = { text, created_at: new Date().toISOString() };
-      if (related.startsWith('deal:')) obj.deal_id = related.split(':')[1];
+      if (relatedText) {
+        const match = data.deals.find(d => d.property.toLowerCase().includes(relatedText.toLowerCase()));
+        if (match) obj.deal_id = match.id;
+        else obj.related_text = relatedText; // store the typed text even if no exact match
+      }
       try {
         const { error } = await supabase.from('messages').insert(obj);
         if (error) throw error;
@@ -1661,11 +1690,6 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
       } catch (e) {
         alert('Could not send message. Make sure the messages table exists.\n\n' + (e.message || e));
       }
-    }
-      const count = data.tasks.filter(t => !t.done).length;
-      const badge = document.getElementById('tasks-badge');
-      badge.textContent = count;
-      badge.style.display = count ? 'inline' : 'none';
     }
 
     // ========== NAV ==========
