@@ -858,6 +858,28 @@
               </div>
             </div>
 
+            <div class="card" style="margin-top:20px">
+              <div class="card-header">
+                <h2>Active Transactions</h2>
+                <button class="btn btn-primary btn-sm" onclick="openDealModal()">+ Deal</button>
+              </div>
+              <div class="card-body">
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Property</th>
+                        <th>Client</th>
+                        <th>Status</th>
+                        <th>Closing</th>
+                      </tr>
+                    </thead>
+                    <tbody id="active-deals-table"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
             <div class="data-section">
               <h3>Data</h3>
               <button class="btn btn-secondary btn-sm" onclick="exportData()">Export JSON backup</button>
@@ -1563,6 +1585,21 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
     }
 
     function renderActiveDeals() {
+      const el = document.getElementById('active-deals-table');
+      if (!el) return;
+      const active = data.deals.filter(d => d.status !== 'Closed');
+      if (!active.length) {
+        el.innerHTML = '<tr><td colspan="4" class="empty">No active deals</td></tr>';
+        return;
+      }
+      el.innerHTML = active.map(d => `
+        <tr style="cursor:pointer" onclick="openDealModal('${d.id}')">
+          <td><strong>${esc(d.property)}</strong></td>
+          <td>${esc(getClientName(d.client_id))}</td>
+          <td><span class="status-badge ${statusClass(d.status)}" style="cursor:pointer" onclick="event.stopPropagation(); showStatusPicker('${d.id}', '${esc(d.status)}', event)" title="Click to change status">${esc(d.status)}</span></td>
+          <td>${formatDate(d.closing)}</td>
+        </tr>`).join('');
+    }
       const active = data.deals.filter(d => d.status !== 'Closed');
       const el = document.getElementById('active-deals-table');
       if (!active.length) {
