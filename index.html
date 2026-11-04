@@ -851,24 +851,10 @@
               </div>
               <div class="card">
                 <div class="card-header">
-                  <h2>Active Transactions</h2>
-                  <button class="btn btn-primary btn-sm" onclick="openDealModal()">+ Deal</button>
+                  <h2>Recent Messages</h2>
+                  <button class="btn btn-secondary btn-sm" onclick="showPage('communication')">View all</button>
                 </div>
-                <div class="card-body">
-                  <div class="table-wrap">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Property</th>
-                          <th>Client</th>
-                          <th>Status</th>
-                          <th>Closing</th>
-                        </tr>
-                      </thead>
-                      <tbody id="active-deals-table"></tbody>
-                    </table>
-                  </div>
-                </div>
+                <div class="card-body" id="dashboard-messages"></div>
               </div>
             </div>
 
@@ -1492,9 +1478,32 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
       }
     }
 
+    function renderDashboardMessages() {
+      const el = document.getElementById('dashboard-messages');
+      if (!el) return;
+      const recent = data.messages.slice(0, 5);
+      if (!recent.length) {
+        el.innerHTML = '<div class="empty">No messages yet</div>';
+        return;
+      }
+      el.innerHTML = recent.map(m => {
+        const related = m.deal_id ? getDealProperty(m.deal_id) : (m.related_text || 'General');
+        return `<div class="task-item">
+          <div class="task-content">
+            <div class="task-title">${esc(m.text)}</div>
+            <div class="task-meta">
+              <span>${related}</span>
+              <span>· ${new Date(m.created_at).toLocaleString()}</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
     function renderAll() {
       renderStats();
       renderTasksDueSoon();
+      renderDashboardMessages();
       renderActiveDeals();
       renderClientsTable();
       renderDealsTable();
@@ -1648,18 +1657,43 @@ create policy "Allow all" on settings for all using (true) with check (true);</p
         el.innerHTML = '<div class="empty">No messages yet</div>';
         return;
       }
-      el.innerHTML = data.messages.map(m => {
-        const related = m.deal_id ? getDealProperty(m.deal_id) : (m.related_text || 'General');
-        return `<div class="task-item">
+      // Group by thread (parent or self)
+      const threads = {};
+      data.messages.forEach(m => {
+        const key = m.parent_id || m.id;
+        if (!threads[key]) threads[key] = [];
+        threads[key].push(m);
+      });
+      el.innerHTML = Object.values(threads).map(thread => {
+        const main = thread[0];
+        const related = main.deal_id ? getDealProperty(main.deal_id) : (main.related_text || 'General');
+        const replies = thread.slice(1).map(r => `
+          <div style="margin-left:20px;padding:8px 0;border-top:1px solid #f1f5f9;font-size:13px">
+            <div>${esc(r.text)}</div>
+            <div style="color:#64748b;font-size:12px">${new Date(r.created_at).toLocaleString()}</div>
+          </div>`).join('');
+        return `<div class="task-item" style="flex-direction:column;align-items:stretch">
           <div class="task-content">
-            <div class="task-title">${esc(m.text)}</div>
+            <div class="task-title">${esc(main.text)}</div>
             <div class="task-meta">
               <span>${related}</span>
-              <span>· ${new Date(m.created_at).toLocaleString()}</span>
+              <span>· ${new Date(main.created_at).toLocaleString()}</span>
+              <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="replyToMessage('${main.id}')">Reply</button>
             </div>
+            ${replies}
           </div>
         </div>`;
       }).join('');
+    }
+
+    function replyToMessage(parentId) {
+      const text = prompt('Type your reply:');
+      if (!text || !text.trim()) return;
+      supabase.from('messages').insert({
+        text: text.trim(),
+        parent_id: parentId,
+        created_at: new Date().toISOString()
+      }).then(() => loadAllData()).catch(e => alert('Reply failed: ' + (e.message || e)));
     }
 
     function openMessageModal() {
